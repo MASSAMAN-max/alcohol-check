@@ -145,8 +145,10 @@
   </footer>
 
   <script>
-    // 🔗 【要修正】デプロイしたGASのWebアプリURLをここに貼り付けてください
+
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbye6VEXwclrTVEg6buiGWRlS79o1uSMUlW5vsPk60HHPrIWFCpyeatgfo-xnRZX5n9Kag/exec";
+// 🌟 ローカルストレージの管理キー名
+    const STORAGE_KEY = "alcohol_checker_user_session";
 
     let currentUser = { userId: "", userName: "" };
 
@@ -154,6 +156,7 @@
     const formSection = document.getElementById("formSection");
     const previewModal = document.getElementById("previewModal");
     const modalCard = document.getElementById("modalCard");
+    const logoutBtn = document.getElementById("logoutBtn");
 
     function setInitialDateTime() {
       const now = new Date();
@@ -171,8 +174,69 @@
       }
     });
 
+    // 🌟 共通：ログイン成功時の画面構築・データ展開処理
+    function initFormFields(userData) {
+      currentUser.userId = userData.userId;
+      currentUser.userName = userData.userName;
+
+      document.getElementById("userName").value = userData.userName;
+      setInitialDateTime();
+
+      // 車両ドロップダウン生成
+      const carSelect = document.getElementById("carName");
+      carSelect.innerHTML = ""; 
+      if (userData.allCars && userData.allCars.length > 0) {
+        userData.allCars.forEach(car => {
+          const opt = document.createElement("option");
+          opt.value = car; opt.textContent = car;
+          if (car === userData.defaultCar) opt.selected = true;
+          carSelect.appendChild(opt);
+        });
+      }
+
+      // 検知器番号ドロップダウン生成
+      const deviceSelect = document.getElementById("deviceNo");
+      deviceSelect.innerHTML = "";
+      if (userData.allDevices && userData.allDevices.length > 0) {
+        userData.allDevices.forEach(device => {
+          const opt = document.createElement("option");
+          opt.value = device; opt.textContent = device;
+          if (device === userData.defaultDevice) opt.selected = true;
+          deviceSelect.appendChild(opt);
+        });
+      }
+
+      // 画面切り替えとログアウトボタンの表示
+      loginSection.classList.add("hidden");
+      formSection.classList.remove("hidden");
+      logoutBtn.classList.remove("hidden");
+    }
+
+    // 🌟 ページ読み込み時：ローカルストレージの確認（自動ログイン）
+    window.addEventListener("DOMContentLoaded", () => {
+      const savedSession = localStorage.getItem(STORAGE_KEY);
+      if (savedSession) {
+        try {
+          const userData = JSON.parse(savedSession);
+          // 保存されたデータがあればフォームを即時生成
+          initFormFields(userData);
+        } catch (e) {
+          console.error("セッションデータの解析に失敗しました。", e);
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    });
+
+    // 🌟 ログアウト処理
+    logoutBtn.addEventListener("click", () => {
+      if (confirm("ログアウト（ユーザー切替）しますか？")) {
+        localStorage.removeItem(STORAGE_KEY); // ストレージを消去
+        location.reload(); // ページをリロードして初期状態（ログイン画面）へ
+      }
+    });
+
     // --------------------------------------------------------
-    // 1. ログイン処理
+    // 1. ログイン処理（初回）
     // --------------------------------------------------------
     document.getElementById("loginBtn").addEventListener("click", async () => {
       const id = document.getElementById("loginId").value.trim();
@@ -198,46 +262,11 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          currentUser.userId = result.data.userId;
-          currentUser.userName = result.data.userName;
-
-          document.getElementById("userName").value = result.data.userName;
-          setInitialDateTime();
-
-          // 🌟 車両ドロップダウン生成
-          const carSelect = document.getElementById("carName");
-          carSelect.innerHTML = ""; 
-          if (result.data.allCars && result.data.allCars.length > 0) {
-            result.data.allCars.forEach(car => {
-              const opt = document.createElement("option");
-              opt.value = car; opt.textContent = car;
-              if (car === result.data.defaultCar) opt.selected = true;
-              carSelect.appendChild(opt);
-            });
-          } else if (result.data.defaultCar) {
-            const opt = document.createElement("option");
-            opt.value = result.data.defaultCar; opt.textContent = result.data.defaultCar; opt.selected = true;
-            carSelect.appendChild(opt);
-          }
-
-          // 🌟 検知器番号ドロップダウン生成 (新規追加)
-          const deviceSelect = document.getElementById("deviceNo");
-          deviceSelect.innerHTML = "";
-          if (result.data.allDevices && result.data.allDevices.length > 0) {
-            result.data.allDevices.forEach(device => {
-              const opt = document.createElement("option");
-              opt.value = device; opt.textContent = device;
-              if (device === result.data.defaultDevice) opt.selected = true;
-              deviceSelect.appendChild(opt);
-            });
-          } else if (result.data.defaultDevice) {
-            const opt = document.createElement("option");
-            opt.value = result.data.defaultDevice; opt.textContent = result.data.defaultDevice; opt.selected = true;
-            deviceSelect.appendChild(opt);
-          }
-
-          loginSection.classList.add("hidden");
-          formSection.classList.remove("hidden");
+          // 🌟 ログイン成功データをローカルストレージに丸ごと保存
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
+          
+          // フォーム初期化
+          initFormFields(result.data);
         } else {
           alert("ログイン失敗: " + result.message);
         }
@@ -258,7 +287,7 @@
       const name = document.getElementById("userName").value;
       const car = document.getElementById("carName").value;
       const timing = document.querySelector('input[name="timing"]:checked').value;
-      const device = document.getElementById("deviceNo").value; // selectの値を取得
+      const device = document.getElementById("deviceNo").value;
       const resVal = parseFloat(document.getElementById("resultValue").value || 0).toFixed(2);
       const alcohol = document.querySelector('input[name="hasAlcohol"]:checked').value;
 
