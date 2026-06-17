@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+
 <!-- PWA・メタデータ設定：プログレッシブウェブアプリ化、アイコン登録 -->
 <link rel="manifest" href="/estimate-creation.json">
 <link rel="icon" href="/icon-192.png">
@@ -14,14 +15,16 @@
   <title>アルコールチェック報告</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style>
-    /* ユーティリティ的な微調整 */
     .modal-open { overflow: hidden; }
   </style>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col justify-between">
 
-  <header class="bg-blue-600 text-white shadow-md p-4 text-center font-bold text-lg">
-    安全運転管理システム
+  <header class="bg-blue-600 text-white shadow-md p-4 text-center font-bold text-lg relative flex items-center justify-center">
+    <span>安全運転管理システム</span>
+    <button id="logoutBtn" class="hidden absolute right-4 bg-blue-700 hover:bg-blue-800 text-xs text-white font-bold py-1.5 px-3 rounded-lg transition border border-blue-500 shadow-sm">
+      ログアウト
+    </button>
   </header>
 
   <main class="flex-grow p-4 flex items-center justify-center">
@@ -60,7 +63,7 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用車両</label>
           <select id="carName" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            </select>
+          </select>
         </div>
 
         <div>
@@ -78,7 +81,7 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用検知器番号</label>
           <select id="deviceNo" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            </select>
+          </select>
         </div>
 
         <div>
@@ -145,9 +148,7 @@
   </footer>
 
   <script>
-
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbye6VEXwclrTVEg6buiGWRlS79o1uSMUlW5vsPk60HHPrIWFCpyeatgfo-xnRZX5n9Kag/exec";
-// 🌟 ローカルストレージの管理キー名
     const STORAGE_KEY = "alcohol_checker_user_session";
 
     let currentUser = { userId: "", userName: "" };
@@ -156,7 +157,7 @@
     const formSection = document.getElementById("formSection");
     const previewModal = document.getElementById("previewModal");
     const modalCard = document.getElementById("modalCard");
-    const logoutBtn = document.getElementById("logoutBtn");
+    const logoutBtn = document.getElementById("logoutBtn"); // 🌟これで正しく取得できるようになります
 
     function setInitialDateTime() {
       const now = new Date();
@@ -174,7 +175,6 @@
       }
     });
 
-    // 🌟 共通：ログイン成功時の画面構築・データ展開処理
     function initFormFields(userData) {
       currentUser.userId = userData.userId;
       currentUser.userName = userData.userName;
@@ -182,7 +182,6 @@
       document.getElementById("userName").value = userData.userName;
       setInitialDateTime();
 
-      // 車両ドロップダウン生成
       const carSelect = document.getElementById("carName");
       carSelect.innerHTML = ""; 
       if (userData.allCars && userData.allCars.length > 0) {
@@ -194,7 +193,6 @@
         });
       }
 
-      // 検知器番号ドロップダウン生成
       const deviceSelect = document.getElementById("deviceNo");
       deviceSelect.innerHTML = "";
       if (userData.allDevices && userData.allDevices.length > 0) {
@@ -206,19 +204,16 @@
         });
       }
 
-      // 画面切り替えとログアウトボタンの表示
       loginSection.classList.add("hidden");
       formSection.classList.remove("hidden");
-      logoutBtn.classList.remove("hidden");
+      logoutBtn.classList.remove("hidden"); // 🌟ログイン時にボタンを表示
     }
 
-    // 🌟 ページ読み込み時：ローカルストレージの確認（自動ログイン）
     window.addEventListener("DOMContentLoaded", () => {
       const savedSession = localStorage.getItem(STORAGE_KEY);
       if (savedSession) {
         try {
           const userData = JSON.parse(savedSession);
-          // 保存されたデータがあればフォームを即時生成
           initFormFields(userData);
         } catch (e) {
           console.error("セッションデータの解析に失敗しました。", e);
@@ -227,17 +222,13 @@
       }
     });
 
-    // 🌟 ログアウト処理
     logoutBtn.addEventListener("click", () => {
       if (confirm("ログアウト（ユーザー切替）しますか？")) {
-        localStorage.removeItem(STORAGE_KEY); // ストレージを消去
-        location.reload(); // ページをリロードして初期状態（ログイン画面）へ
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
       }
     });
 
-    // --------------------------------------------------------
-    // 1. ログイン処理（初回）
-    // --------------------------------------------------------
     document.getElementById("loginBtn").addEventListener("click", async () => {
       const id = document.getElementById("loginId").value.trim();
       const pass = document.getElementById("password").value.trim();
@@ -262,10 +253,7 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          // 🌟 ログイン成功データをローカルストレージに丸ごと保存
           localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
-          
-          // フォーム初期化
           initFormFields(result.data);
         } else {
           alert("ログイン失敗: " + result.message);
@@ -279,9 +267,6 @@
       }
     });
 
-    // --------------------------------------------------------
-    // 2. プレビューモーダル展開
-    // --------------------------------------------------------
     document.getElementById("previewBtn").addEventListener("click", () => {
       const dt = document.getElementById("reportDateTime").value.replace("T", " ");
       const name = document.getElementById("userName").value;
@@ -326,9 +311,6 @@
       }, 150);
     });
 
-    // --------------------------------------------------------
-    // 3. データ送信
-    // --------------------------------------------------------
     document.getElementById("modalSubmitBtn").addEventListener("click", async () => {
       const submitBtn = document.getElementById("modalSubmitBtn");
       submitBtn.innerText = "送信中...";
