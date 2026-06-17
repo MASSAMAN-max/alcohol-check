@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アルコールチェック報告</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    /* ユーティリティ的な微調整 */
+    .modal-open { overflow: hidden; }
+  </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col justify-between">
+
+  <header class="bg-blue-600 text-white shadow-md p-4 text-center font-bold text-lg">
+    安全運転管理システム
+  </header>
+
+  <main class="flex-grow p-4 flex items-center justify-center">
+    
+    <div id="loginSection" class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
+      <h2 class="text-xl font-bold text-center mb-6 text-blue-600">乗務員ログイン</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">ログインID</label>
+          <input type="text" id="loginId" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例: driver01">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">パスワード</label>
+          <input type="password" id="password" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••">
+        </div>
+        <button id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md mt-2">
+          ログイン
+        </button>
+      </div>
+    </div>
+
+    <div id="formSection" class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md hidden">
+      <h2 class="text-xl font-bold text-center mb-6 text-slate-700">アルコール検査報告</h2>
+      
+      <div class="space-y-5">
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">測定日時</label>
+          <input type="datetime-local" id="reportDateTime" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">運転者氏名</label>
+          <input type="text" id="userName" class="w-full border border-slate-200 rounded-lg p-3 bg-slate-100 text-slate-500 font-semibold" readonly>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">使用車両</label>
+          <select id="carName" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2 text-slate-600">実施タイミング</label>
+          <div class="flex gap-4">
+            <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
+              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前
+            </label>
+            <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
+              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">使用検知器番号</label>
+          <input type="text" id="deviceNo" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="検知器の識別番号">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">測定結果 (mg/L)</label>
+          <div class="relative flex items-center">
+            <input type="number" id="resultValue" value="0.00" step="0.01" min="0" class="w-full border border-slate-300 rounded-lg p-3 text-right pr-16 text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="absolute right-4 text-slate-400 font-medium">mg/L</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2 text-slate-600 font-bold">酒気帯び判定</label>
+          <div class="flex gap-4">
+            <label id="labelNoAlcohol" class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-green-50 has-[:checked]:border-green-500 has-[:checked]:text-green-600 font-bold">
+              <input type="radio" name="hasAlcohol" value="無し" checked class="accent-green-600"> 無し
+            </label>
+            <label id="labelHasAlcohol" class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-red-50 has-[:checked]:border-red-500 has-[:checked]:text-red-600 font-bold">
+              <input type="radio" name="hasAlcohol" value="有" class="accent-red-600"> 有り
+            </label>
+          </div>
+        </div>
+
+        <button id="previewBtn" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-lg transition shadow-md mt-4">
+          入力内容を確認する（プレビュー）
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <div id="previewModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0 duration-200" id="modalCard">
+      <div class="bg-slate-800 text-white p-4 font-bold text-center">
+        💡 報告内容の確認
+      </div>
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-slate-500 border-b pb-2">以下の内容で管理システムへ報告を送信します。間違いがないかご確認ください。</p>
+        
+        <table class="w-full text-left border-collapse text-sm">
+          <tbody>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium w-1/3">日時</th><td id="pDateTime" class="py-2.5 font-bold"></td></tr>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium">氏名</th><td id="pName" class="py-2.5 font-bold"></td></tr>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium">使用車両</th><td id="pCar" class="py-2.5 font-bold"></td></tr>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium">タイミング</th><td id="pTiming" class="py-2.5 font-bold"></td></tr>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium">検知器番号</th><td id="pDevice" class="py-2.5 font-bold"></td></tr>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium">測定値</th><td id="pResult" class="py-2.5 text-lg text-blue-600 font-black"></td></tr>
+            <tr class="border-b"><th class="py-2.5 text-slate-500 font-medium">酒気帯び</th><td id="pAlcohol" class="py-2.5 font-black"></td></tr>
+          </tbody>
+        </table>
+
+        <div class="flex gap-3 pt-4">
+          <button id="modalModifyBtn" class="flex-1 border-2 border-slate-300 text-slate-700 font-bold py-3 rounded-lg hover:bg-slate-50 transition">
+            修正する
+          </button>
+          <button id="modalSubmitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-md transition">
+            報告する
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-xs text-slate-400 p-3 bg-slate-200">
+    &copy; 2026 Alcohol Checker System.
+  </footer>
+
+  <script>
+    // 🔗 【要修正】デプロイしたGASのWebアプリURLをここに貼り付けてください
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/XXXXX/exec";
+
+    // ユーザー状態管理
+    let currentUser = {
+      userId: "",
+      userName: ""
+    };
+
+    // 要素の取得
+    const loginSection = document.getElementById("loginSection");
+    const formSection = document.getElementById("formSection");
+    const previewModal = document.getElementById("previewModal");
+    const modalCard = document.getElementById("modalCard");
+
+    // 初期化：現在日時（JST）を datetime-local にセットするヘルパー
+    function setInitialDateTime() {
+      const now = new Date();
+      // タイムゾーンを日本時間に補正したISO文字列を生成
+      const offset = now.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 16);
+      document.getElementById("reportDateTime").value = localISOTime;
+    }
+
+    // アルコール数値が変更されたら「酒気帯び判定」を自動で切り替える親切設計
+    document.getElementById("resultValue").addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value) || 0;
+      if (val > 0) {
+        document.querySelector('input[name="hasAlcohol"][value="有"]').checked = true;
+      } else {
+        document.querySelector('input[name="hasAlcohol"][value="無し"]').checked = true;
+      }
+    });
+
+    // --------------------------------------------------------
+    // 1. ログイン処理
+    // --------------------------------------------------------
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const id = document.getElementById("loginId").value.trim();
+      const pass = document.getElementById("password").value.trim();
+
+      if (!id || !pass) {
+        alert("IDとパスワードを入力してください。");
+        return;
+      }
+
+      document.getElementById("loginBtn").innerText = "認証中...";
+      document.getElementById("loginBtn").disabled = true;
+
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "login",
+            payload: { loginId: id, password: pass }
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          currentUser.userId = result.data.userId;
+          currentUser.userName = result.data.userName;
+
+          // フォームへユーザー情報を反映
+          document.getElementById("userName").value = result.data.userName;
+          document.getElementById("deviceNo").value = result.data.defaultDevice || "";
+          setInitialDateTime();
+
+          // 車両ドロップダウンの動的生成
+          const carSelect = document.getElementById("carName");
+          carSelect.innerHTML = ""; // 初期化
+          
+          if (result.data.allCars && result.data.allCars.length > 0) {
+            result.data.allCars.forEach(car => {
+              const opt = document.createElement("option");
+              opt.value = car;
+              opt.textContent = car;
+              if (car === result.data.defaultCar) {
+                opt.selected = true; // ユーザーに紐づく車両を初期選択
+              }
+              carSelect.appendChild(opt);
+            });
+          } else if (result.data.defaultCar) {
+            // 万が一全件リストが空でもデフォルトがあれば差し込むセーフティ
+            const opt = document.createElement("option");
+            opt.value = result.data.defaultCar;
+            opt.textContent = result.data.defaultCar;
+            opt.selected = true;
+            carSelect.appendChild(opt);
+          }
+
+          // 画面の切り替え表示
+          loginSection.classList.add("hidden");
+          formSection.classList.remove("hidden");
+        } else {
+          alert("ログイン失敗: " + result.message);
+        }
+      } catch (err) {
+        alert("通信エラーが発生しました。");
+        console.error(err);
+      } finally {
+        document.getElementById("loginBtn").innerText = "ログイン";
+        document.getElementById("loginBtn").disabled = false;
+      }
+    });
+
+    // --------------------------------------------------------
+    // 2. プレビューモーダル展開
+    // --------------------------------------------------------
+    document.getElementById("previewBtn").addEventListener("click", () => {
+      // データのフォーマット整形
+      const dt = document.getElementById("reportDateTime").value.replace("T", " ");
+      const name = document.getElementById("userName").value;
+      const car = document.getElementById("carName").value;
+      const timing = document.querySelector('input[name="timing"]:checked').value;
+      const device = document.getElementById("deviceNo").value.trim();
+      const resVal = parseFloat(document.getElementById("resultValue").value || 0).toFixed(2);
+      const alcohol = document.querySelector('input[name="hasAlcohol"]:checked').value;
+
+      if (!car) { return alert("使用車両を選択してください。"); }
+      if (!device) { return alert("使用検知器番号を入力してください。"); }
+
+      // プレビュー側テーブルへ流し込み
+      document.getElementById("pDateTime").textContent = dt;
+      document.getElementById("pName").textContent = name;
+      document.getElementById("pCar").textContent = car;
+      document.getElementById("pTiming").textContent = `運転${timing}`;
+      document.getElementById("pDevice").textContent = device;
+      document.getElementById("pResult").textContent = `${resVal} mg/L`;
+      
+      const alcoholTd = document.getElementById("pAlcohol");
+      alcoholTd.textContent = alcohol;
+      if (alcohol === "有") {
+        alcoholTd.className = "py-2.5 font-black text-red-600 animate-pulse";
+      } else {
+        alcoholTd.className = "py-2.5 font-black text-green-600";
+      }
+
+      // モーダル表示アニメーション
+      document.body.classList.add("modal-open");
+      previewModal.classList.remove("hidden");
+      setTimeout(() => {
+        modalCard.classList.remove("scale-95", "opacity-0");
+        modalCard.classList.add("scale-100", "opacity-100");
+      }, 5);
+    });
+
+    // モーダル閉じる（修正するボタン）
+    document.getElementById("modalModifyBtn").addEventListener("click", () => {
+      modalCard.classList.remove("scale-100", "opacity-100");
+      modalCard.classList.add("scale-95", "opacity-0");
+      setTimeout(() => {
+        previewModal.classList.add("hidden");
+        document.body.classList.remove("modal-open");
+      }, 150);
+    });
+
+    // --------------------------------------------------------
+    // 3. スプレッドシートへデータ報告（確定送信）
+    // --------------------------------------------------------
+    document.getElementById("modalSubmitBtn").addEventListener("click", async () => {
+      const submitBtn = document.getElementById("modalSubmitBtn");
+      submitBtn.innerText = "送信中...";
+      submitBtn.disabled = true;
+
+      // ペイロードデータの組み立て
+      const payload = {
+        currentUserName: currentUser.userName,
+        userId: currentUser.userId,
+        reportDateTime: document.getElementById("reportDateTime").value.replace("T", " "),
+        carName: document.getElementById("carName").value,
+        timing: document.querySelector('input[name="timing"]:checked').value,
+        deviceNo: document.getElementById("deviceNo").value.trim(),
+        resultValue: parseFloat(document.getElementById("resultValue").value || 0).toFixed(2),
+        hasAlcohol: document.querySelector('input[name="hasAlcohol"]:checked').value
+      };
+
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "saveReport",
+            payload: payload
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          alert("✅ 報告が正常に記録されました。");
+          // モーダルを閉じ、測定結果をデフォルトに戻す
+          document.getElementById("modalModifyBtn").click();
+          document.getElementById("resultValue").value = "0.00";
+          document.querySelector('input[name="hasAlcohol"][value="無し"]').checked = true;
+          setInitialDateTime(); // 次の報告のために時間を更新
+        } else {
+          alert("送信エラー: " + result.message);
+        }
+      } catch (err) {
+        alert("サーバーとの通信に失敗しました。再度お試しください。");
+        console.error(err);
+      } finally {
+        submitBtn.innerText = "報告する";
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
