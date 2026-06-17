@@ -67,17 +67,18 @@
           <label class="block text-sm font-medium mb-2 text-slate-600">実施タイミング</label>
           <div class="flex gap-4">
             <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
-              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前（自宅出発前）
+              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前
             </label>
             <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
-              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後（自宅到着後）
+              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後
             </label>
           </div>
         </div>
 
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用検知器番号</label>
-          <input type="text" id="deviceNo" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="検知器の識別番号">
+          <select id="deviceNo" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            </select>
         </div>
 
         <div>
@@ -144,31 +145,23 @@
   </footer>
 
   <script>
-
+    // 🔗 【要修正】デプロイしたGASのWebアプリURLをここに貼り付けてください
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbye6VEXwclrTVEg6buiGWRlS79o1uSMUlW5vsPk60HHPrIWFCpyeatgfo-xnRZX5n9Kag/exec";
 
-    // ユーザー状態管理
-    let currentUser = {
-      userId: "",
-      userName: ""
-    };
+    let currentUser = { userId: "", userName: "" };
 
-    // 要素の取得
     const loginSection = document.getElementById("loginSection");
     const formSection = document.getElementById("formSection");
     const previewModal = document.getElementById("previewModal");
     const modalCard = document.getElementById("modalCard");
 
-    // 初期化：現在日時（JST）を datetime-local にセットするヘルパー
     function setInitialDateTime() {
       const now = new Date();
-      // タイムゾーンを日本時間に補正したISO文字列を生成
       const offset = now.getTimezoneOffset() * 60000;
       const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 16);
       document.getElementById("reportDateTime").value = localISOTime;
     }
 
-    // アルコール数値が変更されたら「酒気帯び判定」を自動で切り替える親切設計
     document.getElementById("resultValue").addEventListener("input", (e) => {
       const val = parseFloat(e.target.value) || 0;
       if (val > 0) {
@@ -208,35 +201,41 @@
           currentUser.userId = result.data.userId;
           currentUser.userName = result.data.userName;
 
-          // フォームへユーザー情報を反映
           document.getElementById("userName").value = result.data.userName;
-          document.getElementById("deviceNo").value = result.data.defaultDevice || "";
           setInitialDateTime();
 
-          // 車両ドロップダウンの動的生成
+          // 🌟 車両ドロップダウン生成
           const carSelect = document.getElementById("carName");
-          carSelect.innerHTML = ""; // 初期化
-          
+          carSelect.innerHTML = ""; 
           if (result.data.allCars && result.data.allCars.length > 0) {
             result.data.allCars.forEach(car => {
               const opt = document.createElement("option");
-              opt.value = car;
-              opt.textContent = car;
-              if (car === result.data.defaultCar) {
-                opt.selected = true; // ユーザーに紐づく車両を初期選択
-              }
+              opt.value = car; opt.textContent = car;
+              if (car === result.data.defaultCar) opt.selected = true;
               carSelect.appendChild(opt);
             });
           } else if (result.data.defaultCar) {
-            // 万が一全件リストが空でもデフォルトがあれば差し込むセーフティ
             const opt = document.createElement("option");
-            opt.value = result.data.defaultCar;
-            opt.textContent = result.data.defaultCar;
-            opt.selected = true;
+            opt.value = result.data.defaultCar; opt.textContent = result.data.defaultCar; opt.selected = true;
             carSelect.appendChild(opt);
           }
 
-          // 画面の切り替え表示
+          // 🌟 検知器番号ドロップダウン生成 (新規追加)
+          const deviceSelect = document.getElementById("deviceNo");
+          deviceSelect.innerHTML = "";
+          if (result.data.allDevices && result.data.allDevices.length > 0) {
+            result.data.allDevices.forEach(device => {
+              const opt = document.createElement("option");
+              opt.value = device; opt.textContent = device;
+              if (device === result.data.defaultDevice) opt.selected = true;
+              deviceSelect.appendChild(opt);
+            });
+          } else if (result.data.defaultDevice) {
+            const opt = document.createElement("option");
+            opt.value = result.data.defaultDevice; opt.textContent = result.data.defaultDevice; opt.selected = true;
+            deviceSelect.appendChild(opt);
+          }
+
           loginSection.classList.add("hidden");
           formSection.classList.remove("hidden");
         } else {
@@ -255,19 +254,17 @@
     // 2. プレビューモーダル展開
     // --------------------------------------------------------
     document.getElementById("previewBtn").addEventListener("click", () => {
-      // データのフォーマット整形
       const dt = document.getElementById("reportDateTime").value.replace("T", " ");
       const name = document.getElementById("userName").value;
       const car = document.getElementById("carName").value;
       const timing = document.querySelector('input[name="timing"]:checked').value;
-      const device = document.getElementById("deviceNo").value.trim();
+      const device = document.getElementById("deviceNo").value; // selectの値を取得
       const resVal = parseFloat(document.getElementById("resultValue").value || 0).toFixed(2);
       const alcohol = document.querySelector('input[name="hasAlcohol"]:checked').value;
 
       if (!car) { return alert("使用車両を選択してください。"); }
-      if (!device) { return alert("使用検知器番号を入力してください。"); }
+      if (!device) { return alert("使用検知器番号を選択してください。"); }
 
-      // プレビュー側テーブルへ流し込み
       document.getElementById("pDateTime").textContent = dt;
       document.getElementById("pName").textContent = name;
       document.getElementById("pCar").textContent = car;
@@ -283,7 +280,6 @@
         alcoholTd.className = "py-2.5 font-black text-green-600";
       }
 
-      // モーダル表示アニメーション
       document.body.classList.add("modal-open");
       previewModal.classList.remove("hidden");
       setTimeout(() => {
@@ -292,7 +288,6 @@
       }, 5);
     });
 
-    // モーダル閉じる（修正するボタン）
     document.getElementById("modalModifyBtn").addEventListener("click", () => {
       modalCard.classList.remove("scale-100", "opacity-100");
       modalCard.classList.add("scale-95", "opacity-0");
@@ -303,21 +298,20 @@
     });
 
     // --------------------------------------------------------
-    // 3. スプレッドシートへデータ報告（確定送信）
+    // 3. データ送信
     // --------------------------------------------------------
     document.getElementById("modalSubmitBtn").addEventListener("click", async () => {
       const submitBtn = document.getElementById("modalSubmitBtn");
       submitBtn.innerText = "送信中...";
       submitBtn.disabled = true;
 
-      // ペイロードデータの組み立て
       const payload = {
         currentUserName: currentUser.userName,
         userId: currentUser.userId,
         reportDateTime: document.getElementById("reportDateTime").value.replace("T", " "),
         carName: document.getElementById("carName").value,
         timing: document.querySelector('input[name="timing"]:checked').value,
-        deviceNo: document.getElementById("deviceNo").value.trim(),
+        deviceNo: document.getElementById("deviceNo").value,
         resultValue: parseFloat(document.getElementById("resultValue").value || 0).toFixed(2),
         hasAlcohol: document.querySelector('input[name="hasAlcohol"]:checked').value
       };
@@ -334,12 +328,11 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          alert("✅ 報告が正常に記録されました。");
-          // モーダルを閉じ、測定結果をデフォルトに戻す
+          alert("🎉 報告が正常にスプレッドシートに記録されました。");
           document.getElementById("modalModifyBtn").click();
           document.getElementById("resultValue").value = "0.00";
           document.querySelector('input[name="hasAlcohol"][value="無し"]').checked = true;
-          setInitialDateTime(); // 次の報告のために時間を更新
+          setInitialDateTime();
         } else {
           alert("送信エラー: " + result.message);
         }
