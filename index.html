@@ -14,11 +14,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>アルコールチェック報告</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     .modal-open { overflow: hidden; }
   </style>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col justify-between">
+
+  <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col items-center justify-center z-[100] hidden">
+    <div class="animate-spin rounded-full h-14 w-14 border-4 border-blue-500 border-t-transparent mb-4 shadow-md"></div>
+    <p id="loadingMessage" class="text-white font-bold text-lg tracking-wider">最新データを取得中...</p>
+  </div>
 
   <header class="bg-blue-600 text-white shadow-md p-4 text-center font-bold text-lg relative flex items-center justify-center">
     <span>安全運転管理システム</span>
@@ -63,7 +69,6 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用車両</label>
           <select id="carName" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            <option value="">最新データ取得中...</option>
           </select>
         </div>
 
@@ -82,7 +87,6 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用検知器番号</label>
           <select id="deviceNo" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            <option value="">最新データ取得中...</option>
           </select>
         </div>
 
@@ -160,6 +164,19 @@
     const previewModal = document.getElementById("previewModal");
     const modalCard = document.getElementById("modalCard");
     const logoutBtn = document.getElementById("logoutBtn");
+    
+    // 🌟 操作ブロック制御用エレメント
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const loadingMessage = document.getElementById("loadingMessage");
+
+    // 🌟 画面全体をロック・解除する共通ヘルパー
+    function showLoading(msg = "処理中...") {
+      loadingMessage.textContent = msg;
+      loadingOverlay.classList.remove("hidden");
+    }
+    function hideLoading() {
+      loadingOverlay.classList.add("hidden");
+    }
 
     function setInitialDateTime() {
       const now = new Date();
@@ -177,7 +194,6 @@
       }
     });
 
-    // 🌟 変更：ドロップダウン部分の生成ロジックのみを関数として独立化
     function updateDropdowns(userData) {
       const carSelect = document.getElementById("carName");
       carSelect.innerHTML = ""; 
@@ -206,15 +222,12 @@
       }
     }
 
-    // 初回ログイン成功時の画面構築
     function initFormFields(userData) {
       currentUser.userId = userData.userId;
       currentUser.userName = userData.userName;
 
       document.getElementById("userName").value = userData.userName;
       setInitialDateTime();
-
-      // ドロップダウンを生成
       updateDropdowns(userData);
 
       loginSection.classList.add("hidden");
@@ -222,28 +235,23 @@
       logoutBtn.classList.remove("hidden");
     }
 
-    // 🌟 変更：ページ読み込み時（自動ログイン時）の挙動
+    // 🌟 自動ログイン：リスト取得まで全画面を操作不能ロック
     window.addEventListener("DOMContentLoaded", async () => {
       const savedSession = localStorage.getItem(STORAGE_KEY);
       if (savedSession) {
         try {
           const session = JSON.parse(savedSession);
           
-          // 1. まずは手元にある「氏名」を使って、待たせることなくフォーム画面を表示
+          // 待機画面を起動して操作をブロック
+          showLoading("最新のマスターデータを取得中...");
+
+          // フォーム側の基礎構築だけ先に完了させておく
           currentUser.userId = session.userId;
           currentUser.userName = session.userName;
           document.getElementById("userName").value = session.userName;
           setInitialDateTime();
-          
-          loginSection.classList.add("hidden");
-          formSection.classList.remove("hidden");
-          logoutBtn.classList.remove("hidden");
 
-          // リストは一旦「取得中」表示にする
-          document.getElementById("carName").innerHTML = '<option value="">最新データ取得中...</option>';
-          document.getElementById("deviceNo").innerHTML = '<option value="">最新データ取得中...</option>';
-
-          // 2. 裏（バックグラウンド）で自動的にGASへ通信し、最新のマスターリストを取得
+          // GASから最新マスタをフェッチ
           const response = await fetch(GAS_WEB_APP_URL, {
             method: "POST",
             body: JSON.stringify({
@@ -255,10 +263,13 @@
           const result = await response.json();
 
           if (result.status === "success") {
-            // 3. 最新のリストが届いたら、ドロップダウンをそっと上書き更新
             updateDropdowns(result.data);
             
-            // ユーザー情報に変更があった場合のために、ストレージも最新状態に更新
+            // ログイン画面からフォームへ切り替え
+            loginSection.classList.add("hidden");
+            formSection.classList.remove("hidden");
+            logoutBtn.classList.remove("hidden");
+
             const updatedSession = {
               loginId: session.loginId,
               password: session.password,
@@ -267,36 +278,58 @@
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSession));
           } else {
-            // 万が一パスワード変更などで認証が通らなくなっていた場合は初期化
             localStorage.removeItem(STORAGE_KEY);
             location.reload();
           }
         } catch (e) {
-          console.error("自動ログイン・最新リストの都度取得に失敗しました。", e);
-          document.getElementById("carName").innerHTML = '<option value="">データ取得失敗（再読込してください）</option>';
-          document.getElementById("deviceNo").innerHTML = '<option value="">データ取得失敗（再読込してください）</option>';
+          console.error(e);
+          Swal.fire({
+            icon: 'error',
+            title: 'データ同期失敗',
+            text: 'マスターデータの取得に失敗しました。ページを再読み込みしてください。',
+            confirmButtonColor: '#2563eb'
+          });
+        } finally {
+          hideLoading(); // 🌟 リストが揃ったらロックを全面解除
         }
       }
     });
 
-    logoutBtn.addEventListener("click", () => {
-      if (confirm("ログアウト（ユーザー切替）しますか？")) {
+    // 🌟 ログアウト確認ダイアログのSweetAlert2化
+    logoutBtn.addEventListener("click", async () => {
+      const confirmLogout = await Swal.fire({
+        title: 'ログアウトしますか？',
+        text: 'ユーザー情報を切り替える場合はログアウトを行ってください。',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'ログアウト',
+        cancelButtonText: 'キャンセル'
+      });
+
+      if (confirmLogout.isConfirmed) {
         localStorage.removeItem(STORAGE_KEY);
         location.reload();
       }
     });
 
+    // 初回ログイン処理のUIアップデート
     document.getElementById("loginBtn").addEventListener("click", async () => {
       const id = document.getElementById("loginId").value.trim();
       const pass = document.getElementById("password").value.trim();
 
       if (!id || !pass) {
-        alert("IDとパスワードを入力してください。");
+        Swal.fire({
+          icon: 'warning',
+          title: '入力エラー',
+          text: 'IDとパスワードを入力してください。',
+          confirmButtonColor: '#2563eb'
+        });
         return;
       }
 
-      document.getElementById("loginBtn").innerText = "認証中...";
-      document.getElementById("loginBtn").disabled = true;
+      showLoading("ユーザー認証中...");
 
       try {
         const response = await fetch(GAS_WEB_APP_URL, {
@@ -310,7 +343,6 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          // 🌟 変更：マスタデータそのものは保存せず、認証情報（ID・パスワード等）のみをストレージに記憶
           const sessionData = {
             loginId: id,
             password: pass,
@@ -318,17 +350,25 @@
             userId: result.data.userId
           };
           localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionData));
-          
           initFormFields(result.data);
         } else {
-          alert("ログイン失敗: " + result.message);
+          Swal.fire({
+            icon: 'error',
+            title: 'ログイン失敗',
+            text: result.message,
+            confirmButtonColor: '#2563eb'
+          });
         }
       } catch (err) {
-        alert("通信エラーが発生しました。");
+        Swal.fire({
+          icon: 'error',
+          title: '通信エラー',
+          text: 'サーバーとの通信に失敗しました。電波状況を確認してください。',
+          confirmButtonColor: '#2563eb'
+        });
         console.error(err);
       } finally {
-        document.getElementById("loginBtn").innerText = "ログイン";
-        document.getElementById("loginBtn").disabled = false;
+        hideLoading();
       }
     });
 
@@ -341,8 +381,12 @@
       const resVal = parseFloat(document.getElementById("resultValue").value || 0).toFixed(2);
       const alcohol = document.querySelector('input[name="hasAlcohol"]:checked').value;
 
-      if (!car) { return alert("使用車両を選択してください。"); }
-      if (!device) { return alert("使用検知器番号を選択してください。"); }
+      if (!car) {
+        return Swal.fire({ icon: 'warning', title: '未選択の項目', text: '使用車両を選択してください。', confirmButtonColor: '#2563eb' });
+      }
+      if (!device) {
+        return Swal.fire({ icon: 'warning', title: '未選択の項目', text: '使用検知器番号を選択してください。', confirmButtonColor: '#2563eb' });
+      }
 
       document.getElementById("pDateTime").textContent = dt;
       document.getElementById("pName").textContent = name;
@@ -376,10 +420,13 @@
       }, 150);
     });
 
+    // 🌟 データ送信処理のUIアップデート
     document.getElementById("modalSubmitBtn").addEventListener("click", async () => {
-      const submitBtn = document.getElementById("modalSubmitBtn");
-      submitBtn.innerText = "送信中...";
-      submitBtn.disabled = true;
+      // 一度プレビューモーダルを閉じる
+      document.getElementById("modalModifyBtn").click();
+      
+      // 全画面ロックを起動
+      showLoading("報告データを送信中...");
 
       const payload = {
         currentUserName: currentUser.userName,
@@ -404,20 +451,35 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          alert("🎉 報告が正常にスプレッドシートに記録されました。");
-          document.getElementById("modalModifyBtn").click();
+          // 🌟 成功通知を SweetAlert2 に変更
+          Swal.fire({
+            icon: 'success',
+            title: '送信完了',
+            text: '🎉 報告が正常にスプレッドシートに記録されました。',
+            confirmButtonColor: '#16a34a'
+          });
+          
           document.getElementById("resultValue").value = "0.00";
           document.querySelector('input[name="hasAlcohol"][value="無し"]').checked = true;
           setInitialDateTime();
         } else {
-          alert("送信エラー: " + result.message);
+          Swal.fire({
+            icon: 'error',
+            title: '送信失敗',
+            text: result.message,
+            confirmButtonColor: '#2563eb'
+          });
         }
       } catch (err) {
-        alert("サーバーとの通信に失敗しました。再度お試しください。");
+        Swal.fire({
+          icon: 'error',
+          title: '通信エラー',
+          text: 'サーバーとの接続に失敗しました。再度お試しください。',
+          confirmButtonColor: '#2563eb'
+        });
         console.error(err);
       } finally {
-        submitBtn.innerText = "報告する";
-        submitBtn.disabled = false;
+        hideLoading(); // 🌟 ロック解除
       }
     });
   </script>
