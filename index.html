@@ -1,16 +1,14 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-
-<!-- PWA・メタデータ設定：プログレッシブウェブアプリ化、アイコン登録 -->
-<link rel="manifest" href="/alcohol-check.json">
-<link rel="icon" href="/icon-192.png">
-<link rel="apple-touch-icon" href="/icon-512.png">
-<meta name="theme-color" content="#ffffff">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/alcohol-check.json">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-512.png">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   
-<meta charset="UTF-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>アルコールチェック報告</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -165,11 +163,22 @@
     const modalCard = document.getElementById("modalCard");
     const logoutBtn = document.getElementById("logoutBtn");
     
-    // 操作ブロック制御用エレメント
     const loadingOverlay = document.getElementById("loadingOverlay");
     const loadingMessage = document.getElementById("loadingMessage");
 
-    // 画面全体をロック・解除する共通ヘルパー
+    // 🌟 【新規】ブラウザ制限によるLocalStorageエラーでシステムが落ちないように安全にカプセル化
+    const safeStorage = {
+      get(key) {
+        try { return localStorage.getItem(key); } catch(e) { return null; }
+      },
+      set(key, val) {
+        try { localStorage.setItem(key, val); return true; } catch(e) { return false; }
+      },
+      remove(key) {
+        try { localStorage.removeItem(key); return true; } catch(e) { return false; }
+      }
+    };
+
     function showLoading(msg = "処理中...") {
       loadingMessage.textContent = msg;
       loadingOverlay.classList.remove("hidden");
@@ -235,23 +244,19 @@
       logoutBtn.classList.remove("hidden");
     }
 
-    // 自動ログイン：リスト取得まで全画面を操作不能ロック
+    // 自動ログイン
     window.addEventListener("DOMContentLoaded", async () => {
-      const savedSession = localStorage.getItem(STORAGE_KEY);
+      const savedSession = safeStorage.get(STORAGE_KEY); // 🌟 安全な呼び出しに変更
       if (savedSession) {
         try {
           const session = JSON.parse(savedSession);
-          
-          // 待機画面を起動して操作をブロック
           showLoading("最新のマスターデータを取得中...");
 
-          // フォーム側の基礎構築だけ先に完了させておく
           currentUser.userId = session.userId;
           currentUser.userName = session.userName;
           document.getElementById("userName").value = session.userName;
           setInitialDateTime();
 
-          // GASから最新マスタをフェッチ
           const response = await fetch(GAS_WEB_APP_URL, {
             method: "POST",
             body: JSON.stringify({
@@ -265,7 +270,6 @@
           if (result.status === "success") {
             updateDropdowns(result.data);
             
-            // ログイン画面からフォームへ切り替え
             loginSection.classList.add("hidden");
             formSection.classList.remove("hidden");
             logoutBtn.classList.remove("hidden");
@@ -276,9 +280,9 @@
               userName: result.data.userName,
               userId: result.data.userId
             };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSession));
+            safeStorage.set(STORAGE_KEY, JSON.stringify(updatedSession)); // 🌟
           } else {
-            localStorage.removeItem(STORAGE_KEY);
+            safeStorage.remove(STORAGE_KEY); // 🌟
             location.reload();
           }
         } catch (e) {
@@ -290,7 +294,7 @@
             confirmButtonColor: '#2563eb'
           });
         } finally {
-          hideLoading(); // リストが揃ったらロックを全面解除
+          hideLoading();
         }
       }
     });
@@ -309,7 +313,7 @@
       });
 
       if (confirmLogout.isConfirmed) {
-        localStorage.removeItem(STORAGE_KEY);
+        safeStorage.remove(STORAGE_KEY); // 🌟
         location.reload();
       }
     });
@@ -349,7 +353,7 @@
             userName: result.data.userName,
             userId: result.data.userId
           };
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionData));
+          safeStorage.set(STORAGE_KEY, JSON.stringify(sessionData)); // 🌟 万が一保存制限があっても例外を投げない
           initFormFields(result.data);
         } else {
           Swal.fire({
@@ -360,10 +364,11 @@
           });
         }
       } catch (err) {
+        // 🌟 localStorage の例外がここに巻き込まれなくなったため、純粋な通信エラーのみをキャッチします
         Swal.fire({
           icon: 'error',
           title: '通信エラー',
-          text: 'サーバーとの通信に失敗しました。電波状況を確認してください。',
+          text: 'サーバーとの通信に失敗しました。電波状況かGASの公開設定を確認してください。',
           confirmButtonColor: '#2563eb'
         });
         console.error(err);
@@ -420,12 +425,8 @@
       }, 150);
     });
 
-    // 🌟 データ送信処理のUIアップデート
     document.getElementById("modalSubmitBtn").addEventListener("click", async () => {
-      // 一度プレビューモーダルを閉じる
       document.getElementById("modalModifyBtn").click();
-      
-      // 全画面ロックを起動
       showLoading("報告データを送信中...");
 
       const payload = {
@@ -451,7 +452,6 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          // 成功通知
           Swal.fire({
             icon: 'success',
             title: '送信完了',
@@ -479,7 +479,7 @@
         });
         console.error(err);
       } finally {
-        hideLoading(); // ロック解除
+        hideLoading();
       }
     });
   </script>
