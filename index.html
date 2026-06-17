@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
   
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>アルコールチェック報告</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -63,6 +63,7 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用車両</label>
           <select id="carName" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="">最新データ取得中...</option>
           </select>
         </div>
 
@@ -70,10 +71,10 @@
           <label class="block text-sm font-medium mb-2 text-slate-600">実施タイミング</label>
           <div class="flex gap-4">
             <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
-              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前<br>（自宅出発時）
+              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前(自宅出発時)
             </label>
             <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
-              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後<br>（自宅到着時）
+              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後（自宅到着時）
             </label>
           </div>
         </div>
@@ -81,6 +82,7 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-slate-600">使用検知器番号</label>
           <select id="deviceNo" class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="">最新データ取得中...</option>
           </select>
         </div>
 
@@ -157,7 +159,7 @@
     const formSection = document.getElementById("formSection");
     const previewModal = document.getElementById("previewModal");
     const modalCard = document.getElementById("modalCard");
-    const logoutBtn = document.getElementById("logoutBtn"); // 🌟これで正しく取得できるようになります
+    const logoutBtn = document.getElementById("logoutBtn");
 
     function setInitialDateTime() {
       const now = new Date();
@@ -175,13 +177,8 @@
       }
     });
 
-    function initFormFields(userData) {
-      currentUser.userId = userData.userId;
-      currentUser.userName = userData.userName;
-
-      document.getElementById("userName").value = userData.userName;
-      setInitialDateTime();
-
+    // 🌟 変更：ドロップダウン部分の生成ロジックのみを関数として独立化
+    function updateDropdowns(userData) {
       const carSelect = document.getElementById("carName");
       carSelect.innerHTML = ""; 
       if (userData.allCars && userData.allCars.length > 0) {
@@ -191,6 +188,8 @@
           if (car === userData.defaultCar) opt.selected = true;
           carSelect.appendChild(opt);
         });
+      } else {
+        carSelect.innerHTML = '<option value="">車両データがありません</option>';
       }
 
       const deviceSelect = document.getElementById("deviceNo");
@@ -202,22 +201,80 @@
           if (device === userData.defaultDevice) opt.selected = true;
           deviceSelect.appendChild(opt);
         });
+      } else {
+        deviceSelect.innerHTML = '<option value="">検知器データがありません</option>';
       }
+    }
+
+    // 初回ログイン成功時の画面構築
+    function initFormFields(userData) {
+      currentUser.userId = userData.userId;
+      currentUser.userName = userData.userName;
+
+      document.getElementById("userName").value = userData.userName;
+      setInitialDateTime();
+
+      // ドロップダウンを生成
+      updateDropdowns(userData);
 
       loginSection.classList.add("hidden");
       formSection.classList.remove("hidden");
-      logoutBtn.classList.remove("hidden"); // 🌟ログイン時にボタンを表示
+      logoutBtn.classList.remove("hidden");
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
+    // 🌟 変更：ページ読み込み時（自動ログイン時）の挙動
+    window.addEventListener("DOMContentLoaded", async () => {
       const savedSession = localStorage.getItem(STORAGE_KEY);
       if (savedSession) {
         try {
-          const userData = JSON.parse(savedSession);
-          initFormFields(userData);
+          const session = JSON.parse(savedSession);
+          
+          // 1. まずは手元にある「氏名」を使って、待たせることなくフォーム画面を表示
+          currentUser.userId = session.userId;
+          currentUser.userName = session.userName;
+          document.getElementById("userName").value = session.userName;
+          setInitialDateTime();
+          
+          loginSection.classList.add("hidden");
+          formSection.classList.remove("hidden");
+          logoutBtn.classList.remove("hidden");
+
+          // リストは一旦「取得中」表示にする
+          document.getElementById("carName").innerHTML = '<option value="">最新データ取得中...</option>';
+          document.getElementById("deviceNo").innerHTML = '<option value="">最新データ取得中...</option>';
+
+          // 2. 裏（バックグラウンド）で自動的にGASへ通信し、最新のマスターリストを取得
+          const response = await fetch(GAS_WEB_APP_URL, {
+            method: "POST",
+            body: JSON.stringify({
+              action: "login",
+              payload: { loginId: session.loginId, password: session.password }
+            })
+          });
+
+          const result = await response.json();
+
+          if (result.status === "success") {
+            // 3. 最新のリストが届いたら、ドロップダウンをそっと上書き更新
+            updateDropdowns(result.data);
+            
+            // ユーザー情報に変更があった場合のために、ストレージも最新状態に更新
+            const updatedSession = {
+              loginId: session.loginId,
+              password: session.password,
+              userName: result.data.userName,
+              userId: result.data.userId
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSession));
+          } else {
+            // 万が一パスワード変更などで認証が通らなくなっていた場合は初期化
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+          }
         } catch (e) {
-          console.error("セッションデータの解析に失敗しました。", e);
-          localStorage.removeItem(STORAGE_KEY);
+          console.error("自動ログイン・最新リストの都度取得に失敗しました。", e);
+          document.getElementById("carName").innerHTML = '<option value="">データ取得失敗（再読込してください）</option>';
+          document.getElementById("deviceNo").innerHTML = '<option value="">データ取得失敗（再読込してください）</option>';
         }
       }
     });
@@ -253,7 +310,15 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
+          // 🌟 変更：マスタデータそのものは保存せず、認証情報（ID・パスワード等）のみをストレージに記憶
+          const sessionData = {
+            loginId: id,
+            password: pass,
+            userName: result.data.userName,
+            userId: result.data.userId
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionData));
+          
           initFormFields(result.data);
         } else {
           alert("ログイン失敗: " + result.message);
