@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<!-- PWA・メタデータ設定：プログレッシブウェブアプリ化、アイコン登録 -->
+<link rel="manifest" href="/estimate-creation.json">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-512.png">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+  
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>アルコールチェック報告</title>
@@ -19,7 +27,7 @@
   <main class="flex-grow p-4 flex items-center justify-center">
     
     <div id="loginSection" class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
-      <h2 class="text-xl font-bold text-center mb-6 text-blue-600">乗務員ログイン</h2>
+      <h2 class="text-xl font-bold text-center mb-6 text-blue-600">ユーザーログイン</h2>
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium mb-1">ログインID</label>
@@ -59,10 +67,10 @@
           <label class="block text-sm font-medium mb-2 text-slate-600">実施タイミング</label>
           <div class="flex gap-4">
             <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
-              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前
+              <input type="radio" name="timing" value="前" checked class="accent-blue-600"> 運転前（自宅出発前）
             </label>
             <label class="flex-1 flex items-center justify-center gap-2 border border-slate-300 rounded-lg p-3 cursor-pointer has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 has-[:checked]:text-blue-600 font-bold">
-              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後
+              <input type="radio" name="timing" value="後" class="accent-blue-600"> 運転後（自宅到着後）
             </label>
           </div>
         </div>
