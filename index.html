@@ -165,11 +165,11 @@
     const modalCard = document.getElementById("modalCard");
     const logoutBtn = document.getElementById("logoutBtn");
     
-    // 🌟 操作ブロック制御用エレメント
+    // 操作ブロック制御用エレメント
     const loadingOverlay = document.getElementById("loadingOverlay");
     const loadingMessage = document.getElementById("loadingMessage");
 
-    // 🌟 画面全体をロック・解除する共通ヘルパー
+    // 画面全体をロック・解除する共通ヘルパー
     function showLoading(msg = "処理中...") {
       loadingMessage.textContent = msg;
       loadingOverlay.classList.remove("hidden");
@@ -235,7 +235,7 @@
       logoutBtn.classList.remove("hidden");
     }
 
-    // 🌟 自動ログイン：リスト取得まで全画面を操作不能ロック
+    // 自動ログイン：リスト取得まで全画面を操作不能ロック
     window.addEventListener("DOMContentLoaded", async () => {
       const savedSession = localStorage.getItem(STORAGE_KEY);
       if (savedSession) {
@@ -290,12 +290,12 @@
             confirmButtonColor: '#2563eb'
           });
         } finally {
-          hideLoading(); // 🌟 リストが揃ったらロックを全面解除
+          hideLoading(); // リストが揃ったらロックを全面解除
         }
       }
     });
 
-    // 🌟 ログアウト確認ダイアログのSweetAlert2化
+    // ログアウト確認ダイアログ
     logoutBtn.addEventListener("click", async () => {
       const confirmLogout = await Swal.fire({
         title: 'ログアウトしますか？',
@@ -451,11 +451,11 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          // 🌟 成功通知を SweetAlert2 に変更
+          // 成功通知
           Swal.fire({
             icon: 'success',
             title: '送信完了',
-            text: '🎉 報告が正常にスプレッドシートに記録されました。',
+            text: '報告が正常に記録されました。',
             confirmButtonColor: '#16a34a'
           });
           
@@ -479,7 +479,7 @@
         });
         console.error(err);
       } finally {
-        hideLoading(); // 🌟 ロック解除
+        hideLoading(); // ロック解除
       }
     });
   </script>
